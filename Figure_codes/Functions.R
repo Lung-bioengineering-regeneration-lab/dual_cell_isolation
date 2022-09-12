@@ -16,7 +16,7 @@ DE <- function(dds=NA, conditions, coefs=NA, xlim,ylim, labSize){
   print(summary(res))
   
   res <- res[order(res$pvalue, decreasing = F),]
-  write.csv(res, file = paste0(c("R_output/", conditions , ".csv"), collapse = ""))
+  write.csv(res, file = paste0(c("data/", conditions , ".csv"), collapse = ""))
   
   res <- as.data.frame(res)
   

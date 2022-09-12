@@ -342,120 +342,30 @@ a[["x"]][["layout"]][["annotations"]][[2]][["text"]] <- ""
 a
 
 
-# ********************************************************************* #
-# Fig4F
-# ********************************************************************* #
 
-results_orgs_3dld <- DE(dds, conditions = c("organoids_3DLD", "pellet_3DLD"), xlim = c(-20,20), labSize = 6.0)
-results_orgs_3dld$volcano
-results_orgs_3dld$res
-
-orgs3dld <- results_orgs_3dld$res
-orgs3dld <- na.omit(orgs3dld)
-orgs3dld$delabel <- NA
-orgs3dld$diffexpressed <- "NO"
-orgs3dld[orgs3dld$pvalue<0.05 & abs(orgs3dld$log2FoldChange)> 1,]$diffexpressed <- "YES"
-
-orgs3dld$delabel[orgs3dld$diffexpressed != "NO"] <- rownames(orgs3dld[orgs3dld$diffexpressed != "NO",])
-
-
-markers<- read.csv("HiRes_markers_0.5.csv", header = T, stringsAsFactors = F, sep = " ")
-
-markers$cellType <- gsub("Activated ", "", markers$cellType)
-markers$cellType <- gsub("ATII cells", "ATII", markers$cellType)
-markers$cellType <- gsub("ATII", "ATII cells", markers$cellType)
-markers$cellType <- gsub("Other ", "", markers$cellType)
-
-
-
-orgs3dld$ext_gene <- rownames(orgs3dld)
-
-orgs3dld1 <- merge(orgs3dld, markers, by="ext_gene",all.x=T)
-
-
-orgs3dld1$label <- NA
-
-
-orgs3dld1[orgs3dld1$diffexpressed=="YES",]$label <- "Differentially Expressed"
-
-orgs3dld1[orgs3dld1$diffexpressed=="YES" & is.na(orgs3dld1$cellType)==FALSE,]$label <- "Cell Marker"
-
-orgs3dld1
-
-summary(as.factor(orgs3dld1$label))
-
-orgs3dld1$labelCells <- NA
-orgs3dld1[orgs3dld1$diffexpressed=="YES",]$labelCells <- "Differentially Expressed"
-orgs3dld1[orgs3dld1$diffexpressed=="YES" & is.na(orgs3dld1$cellType)==FALSE,]$labelCells <- orgs3dld1[orgs3dld1$diffexpressed=="YES" & is.na(orgs3dld1$cellType)==FALSE,]$cellType
-
-orgs3dld2 <- orgs3dld1[orgs3dld1$diffexpressed=="YES" & is.na(orgs3dld1$cellType)==FALSE,]
-
-TPM <- readRDS("data/TPMs_gene_annotated.rds")
-head(counts)
-
-TPM <- TPM[!(rowSums(TPM[,2:19]) < 5),]
-
-#check duplicate ext genes
-TPM <- TPM[!(duplicated(TPM$ext_gene)),]
-rownames(TPM) <- TPM$ext_gene
-TPM %>% select(-contains("gene")) ->TPM
-
-orgs3dldTPM <- TPM[, colnames(TPM)%in%s2c[s2c$condition=="organoids_3DLD",]$sample]
-orgs3dldTPM$mean <- rowMeans(orgs3dldTPM)
-
-orgs3dldTPM %>% select(contains("mean")) %>% rownames_to_column("ext_gene") -> orgs3dldTPM
-
-orgs3dld3 <- merge(orgs3dld1, orgs3dldTPM, by="ext_gene")
-orgs3dld4 <- orgs3dld3[orgs3dld3$diffexpressed=="YES" & is.na(orgs3dld3$cellType)==FALSE,]
-
-orgs3dld4b <- orgs3dld3[is.na(orgs3dld3$cellType)==TRUE,]
-
-
-###################### FIGURE 4F
-ggplot(data=orgs3dld4b, aes(x=log10(mean), y=log2FoldChange)) + 
-  geom_point(color="grey85") +
-  geom_point(data = orgs3dld4,aes(x=log10(mean), y=log2FoldChange, col=labelCells))+
-  geom_text_repel(data = orgs3dld4, mapping = aes(label=ext_gene, color=labelCells),show_guide = F)+
-  xlab("log(TPM[organoids_average])")+
-  ylab("log2FC (organoids vs. pellet))")+
-  theme_minimal()
-
-######### SAME CODE IS APPLIED AS ABOVE FOR CLASSIC ISOLATION> 
-######### JUST CHANGE THE DE TO COMPARE c("organoids_Classic", "pellet_Classic")
 
 
 
 # ********************************************************************* #
-# Fig4G
+# DESeq analysis required for figures 4F and 4G.
 # ********************************************************************* #
 # Load count Data and sample information
-
 #sample information
 s2c <- read.table("data/s2c.csv", header = T, stringsAsFactors = F, sep = ",", row.names = 1)
-
 #load counts 
 counts <- readRDS("data/feature_counts_annotated.rds")
-head(counts)
 
 counts <- counts[!(rowSums(counts[,2:19]) < 5),]
-
 #check duplicate ext genes
 counts <- counts[!(duplicated(counts$ext_gene)),]
-
 rownames(counts) <- counts$ext_gene
-
 counts %>% select(-contains("gene")) ->counts
-
 #order column names same as metadata
 counts <- counts[,s2c$sample]
-
-
 # DEseq
-
 s2c$condition <- as.factor(s2c$condition)
 # this last line is to set the reference condition
 s2c$condition <- relevel(s2c$condition, ref = "pellet_Classic")
-
 dds <- DESeqDataSetFromMatrix(counts, colData = s2c, design = ~condition)
 dds <- estimateSizeFactors( dds )
 sizeFactors( dds )
@@ -468,60 +378,161 @@ dds$condition <- relevel(dds$condition, ref="pellet_3DLD")
 
 dds <- DESeq(dds)
 
+# ********************************************************************* #
+# Fig4F
+# ********************************************************************* #
+# DO NOT FORGET TO LOAD ALL FUNCTIONS in Functions.R into the workspace environment.
+# Run the differential exression for the 3DLD pellets vs. Organoids.
+# 
+results_orgs_3dld <- DE(dds, conditions = c("organoids_3DLD", "pellet_3DLD"), xlim = c(-20,20), labSize = 6.0)
+orgs3dld <- results_orgs_3dld$res %>% na.omit()
+orgs3dld$diffexpressed <- "NO"
+orgs3dld[orgs3dld$pvalue<0.05 & abs(orgs3dld$log2FoldChange)> 1,]$diffexpressed <- "YES"
 
-results_pell_newVsold <- DE(dds, conditions = c("pellet_Classic", "pellet_3DLD"), xlim = c(-13,13), labSize = 6.0)
-results_pell_newVsold$volcano
+# This is just to correct the way the cells are annotated. And to combine what was refered to as activated cells from
+# the original paper of the single cell dataset.
+markers<- read.csv("data/HiRes_markers_0.5.csv", header = T, stringsAsFactors = F, sep = " ")
+markers$cellType <- gsub("Activated ", "", markers$cellType)
+markers$cellType <- gsub("ATII cells", "ATII", markers$cellType)
+markers$cellType <- gsub("ATII", "ATII cells", markers$cellType)
+markers$cellType <- gsub("Other ", "", markers$cellType)
 
-
-results_pell_newVsold$res
-
-res_pellets <- results_pell_newVsold$res
-
-
-#### added on 2022-04-13
-classic_pel_up <- rownames(res_pellets[res_pellets$log2FoldChange >= 1 & res_pellets$pvalue < 0.05,])
-classic_pel_up <- classic_pel_up[-grep("NA", classic_pel_up)]
-classic_pel_down <- rownames(res_pellets[res_pellets$log2FoldChange <= -1 & res_pellets$pvalue < 0.05,])
-classic_pel_down <- classic_pel_down[-grep("NA", classic_pel_down)]
-
-
-
-#### added on 2022-04-13
-results_orgs_classic <- DE(dds, conditions = c("organoids_Classic","pellet_Classic"), xlim = c(-13,13), labSize = 6.0)
-results_orgs_classic$volcano
-results_orgs_classic$res
-
-res_orgsClassic <- results_orgs_classic$res
+## Combine DE list with labels for makers.
+orgs3dld$ext_gene <- rownames(orgs3dld)
+orgs3dld1 <- merge(orgs3dld, markers, by="ext_gene",all.x=T)
 
 
-#### added on 2022-04-13
+TPM <- readRDS("data/TPMs_gene_annotated.rds")
+#filter TPMS with row sumns below 5 transcripts per milion in all samples combined.
+TPM <- TPM[!(rowSums(TPM[,2:19]) < 5),]
+#check duplicate ext genes
+TPM <- TPM[!(duplicated(TPM$ext_gene)),] %>% remove_rownames() %>% column_to_rownames("ext_gene")
+
+# filter out the TPMS for organoids only
+orgs3dldTPM <- TPM[, colnames(TPM)%in%s2c[s2c$condition=="organoids_3DLD",]$sample]
+# filter out the pellet TPMS only
+pel3dldTPM <- TPM[, colnames(TPM)%in%s2c[s2c$condition=="pellet_3DLD",]$sample]
+#calculate means for both.
+orgs3dldTPM_means <- data.frame(row.names = rownames(TPM), "meanPel"= rowMeans(pel3dldTPM), "meanOrgs"= rowMeans(orgs3dldTPM))
+orgs3dldTPM_means %>% rownames_to_column("ext_gene") -> orgs3dldTPM_means
+# Combine differential expression data with the means of TPMS.
+orgs3dld3 <- merge(orgs3dld1, orgs3dldTPM_means, by="ext_gene")
+# generate a ggplot friendly data fram of the sig. genes that are NOT cell markers
+orgs3dld3 %>% filter(diffexpressed=="YES"&is.na(cellType)==T) %>%
+  select(contains(c("ext_gene", "cellType", "meanPel", "meanOrgs", "log2F"))) %>% 
+  gather(key="differentiation", value = "TPM", -ext_gene, -cellType, -log2FoldChange) %>% 
+  arrange(ext_gene) %>% arrange(cellType) -> orgs_TPMs_gray
+# Factorize the gene names to maintain the order made in the previous line.
+orgs_TPMs_gray$ext_gene <- factor(orgs_TPMs_gray$ext_gene, levels = unique(orgs_TPMs_gray$ext_gene))
+
+## make dataframe with all significant genes that are ALSO cell marker genes.
+orgs3dld3 %>% filter(diffexpressed=="YES"&is.na(cellType)==F) %>% 
+  select(contains(c("ext_gene", "cellType", "meanPel", "meanOrgs", "log2F"))) %>% 
+  gather(key="differentiation", value = "TPM", -ext_gene, -cellType, -log2FoldChange) %>% 
+  arrange(ext_gene) %>% arrange(cellType) -> orgs_TPMs
+orgs_TPMs$ext_gene <- factor(orgs_TPMs$ext_gene, levels = unique(orgs_TPMs$ext_gene))
+
+######################## LETS DO the same for Classic organoids
+
+results_orgs <- DE(dds, conditions = c("organoids_Classic", "pellet_Classic"), xlim = c(-20,20), labSize = 6.0)
+orgs <- results_orgs$res %>% na.omit()
+orgs$diffexpressed <- "NO"
+orgs[orgs$pvalue<0.05 & abs(orgs$log2FoldChange)> 1,]$diffexpressed <- "YES"
+
+# This is just to correct the way the cells are annotated. And to combine what was refered to as activated cells from
+# the original paper of the single cell dataset.
+orgs$ext_gene <- rownames(orgs)
+orgs1 <- merge(orgs, markers, by="ext_gene",all.x=T)
+# filter out the TPMS for organoids only
+orgsTPM <- TPM[, colnames(TPM)%in%s2c[s2c$condition=="organoids_Classic",]$sample]
+# filter out the pellet TPMS only
+pelTPM <- TPM[, colnames(TPM)%in%s2c[s2c$condition=="pellet_Classic",]$sample]
+#calculate means for both.
+orgsTPM_means <- data.frame(row.names = rownames(TPM), "meanPel"= rowMeans(pelTPM), "meanOrgs"= rowMeans(orgsTPM))
+orgsTPM_means %>% rownames_to_column("ext_gene") -> orgsTPM_means
+# Combine differential expression data with the means of TPMS.
+orgs3 <- merge(orgs1, orgsTPM_means, by="ext_gene")
+
+# make dataframe with all significant genes that are ALSO cell marker genes.
+orgs3 %>% filter(diffexpressed=="YES"&is.na(cellType)==F) %>% 
+  select(contains(c("ext_gene", "cellType", "meanPel", "meanOrgs", "log2F"))) %>% 
+  gather(key="differentiation", value = "TPM", -ext_gene, -cellType, -log2FoldChange) %>% 
+  arrange(ext_gene) %>% arrange(cellType) -> orgs_TPMs_classic
+orgs_TPMs_classic$ext_gene <- factor(orgs_TPMs_classic$ext_gene, levels = unique(orgs_TPMs_classic$ext_gene))
+
+# generate a ggplot friendly data fram of the sig. genes that are NOT cell markers
+orgs3 %>% filter(diffexpressed=="YES"&is.na(cellType)==T) %>%
+  select(contains(c("ext_gene", "cellType", "meanPel", "meanOrgs", "log2F"))) %>% 
+  gather(key="differentiation", value = "TPM", -ext_gene, -cellType, -log2FoldChange) %>% 
+  arrange(ext_gene) %>% arrange(cellType) -> orgs_TPMs_classic_gray
+# Factorize the gene names to maintain the order made in the previous line.
+orgs_TPMs_classic_gray$ext_gene <- factor(orgs_TPMs_classic_gray$ext_gene, levels = unique(orgs_TPMs_classic_gray$ext_gene))
+
+################################################# Lets prepare to comined both dataframes for 3dld and classic into 1.
+colnames(orgs_TPMs) <- c("ext_gene", "cellType", "log2FC_3DLD", "differentiation", "TPM")
+colnames(orgs_TPMs_gray) <- c("ext_gene", "cellType", "log2FC_3DLD", "differentiation", "TPM")
+
+colnames(orgs_TPMs_classic) <- c("ext_gene", "cellType", "log2FC_Classic", "differentiation", "TPM")
+colnames(orgs_TPMs_classic_gray) <- c("ext_gene", "cellType", "log2FC_Classic", "differentiation", "TPM")
+
+## combine the two data frames.
+orgsDE <- merge(orgs_TPMs_classic, orgs_TPMs, by="ext_gene",all=T) %>% mutate(cellType=coalesce(cellType.x, cellType.y))
+orgsDE_gray <- merge(orgs_TPMs_classic_gray, orgs_TPMs_gray, by="ext_gene",all=T) %>% mutate(cellType=coalesce(cellType.x, cellType.y))
+
+## remove duplicate genes.
+orgsDE %>% filter(differentiation.x=="meanOrgs") %>% distinct(ext_gene, .keep_all = T) -> orgs_DE_d
+orgsDE_gray %>% filter(differentiation.x=="meanOrgs") %>% distinct(ext_gene, .keep_all = T) -> orgs_DE_gray_d
+
+orgs_DE_gray_d$TPM_mean <- rowMeans(data.frame("x"=orgs_DE_gray_d$TPM.x,"y"=orgs_DE_gray_d$TPM.y))
+orgs_DE_d$TPM_mean <- rowMeans(data.frame("x"=orgs_DE_d$TPM.x,"y"=orgs_DE_d$TPM.y))
+
+#### this filtration step gets rid of the NA in only one of both.
+orgs_DE_gray_d %>% filter(TPM_mean >= 1) -> orgs_DE_gray_d_f
+orgs_DE_d %>% filter(TPM_mean >= 1) -> orgs_DE_d_f
+
+orgs_DE_d$NA.x <-NULL
+orgs_DE_d$NA.y <- NULL
+orgs_DE_all <- rbind(orgs_DE_d, orgs_DE_gray_d)
+orgs_DE_all %>% filter(TPM_mean > 1) -> orgs_DE_all_f
+
+## add this part only if you would like to label the dots in the 4th quadrant.
+orgs_DE_all_f$lab <- NA
+orgs_DE_all_f[orgs_DE_all_f$log2FC_Classic>0&orgs_DE_all_f$log2FC_3DLD<0,]$lab <- as.character(orgs_DE_all_f[orgs_DE_all_f$log2FC_Classic>0&orgs_DE_all_f$log2FC_3DLD<0,]$ext_gene)
+
+ggplot(orgs_DE_gray_d_f, aes(x=log2FC_Classic, y=log2FC_3DLD)) + 
+  geom_point(aes(size=log(TPM_mean)),color="grey85") +
+  geom_point(data = orgs_DE_d_f,aes(x=log2FC_Classic, y=log2FC_3DLD, col=cellType,size=log(TPM_mean)))+
+  #Add the following line to label dots in the 4th quadrant.
+  #geom_text_repel(data = orgs_DE_all_f, mapping = aes(label=lab), color="red",show.legend = F, max.overlaps = 20)+
+  theme_bw()+
+  theme(text = element_text(size=20))+
+  geom_vline(xintercept=c(0), size=1, linetype=1, color="black")+
+  geom_hline(yintercept = c(0), size=1, linetype=1, color="black") + 
+  guides(colour = guide_legend(override.aes = list(size=4)))-> orgsDEplot
+
+orgsDEplot
+
+ggsave(filename = "figure4G_legend_colvector.png",orgsDEplot,width = 8, height = 6)
+
+
+# ********************************************************************* #
+# Fig4G
+# ********************************************************************* #
+res_orgsClassic <- results_orgs$res
+
+## Get lists for classic orgs vs pell
 orgclassic_up <- rownames(res_orgsClassic[res_orgsClassic$log2FoldChange > 1 & res_orgsClassic$pvalue < 0.05,])
 orgclassic_up <- orgclassic_up[-grep("NA", orgclassic_up)]
 orgclassic_down <- rownames(res_orgsClassic[res_orgsClassic$log2FoldChange < -1 & res_orgsClassic$pvalue < 0.05,])
 orgclassic_down <- orgclassic_down[-grep("NA", orgclassic_down)]
 
-
-
-
-
-
-results_orgs_3dld <- DE(dds, conditions = c("organoids_3DLD", "pellet_3DLD"), xlim = c(-13,13), labSize = 6.0, ylim = c(0,150))
-results_orgs_3dld$volcano
-results_orgs_3dld$res
-
 res_orgs3dld <- results_orgs_3dld$res
-
-grep("NA", rownames(res_orgs3dld))
-
 orgs3dld_up <- rownames(res_orgs3dld[res_orgs3dld$log2FoldChange > 1 & res_orgs3dld$pvalue < 0.05,])
 orgs3dld_up <- orgs3dld_up[-grep("NA", orgs3dld_up)]
 
-
 orgs3dld_down <- rownames(res_orgs3dld[res_orgs3dld$log2FoldChange < -1 & res_orgs3dld$pvalue < 0.05,])
 orgs3dld_down <- orgs3dld_down[-grep("NA", orgs3dld_down)]
-
 x <- list("Up_Classic_Organoids"=orgclassic_up, "Down_Classic_Organoids"= orgclassic_down, "Up_3DLD_Organoids"=orgs3dld_up, "Down_3DLD_organoids"= orgs3dld_down)
-
 a <- ggvenn(
   x, 
   fill_color = c("#0073C2FF", "#EFC000FF", "#868686FF", "#CD534CFF"),
